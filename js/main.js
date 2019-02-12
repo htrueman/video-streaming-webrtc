@@ -19,10 +19,14 @@ let mediaRecorder;
 let recordedBlobs;
 let sourceBuffer;
 
+let filename = '';
+let preStreamingStarted = false;
+
 const errorMsgElement = document.querySelector('span#errorMsg');
 const recordedVideo = document.querySelector('video#recorded');
 const recordButton = document.querySelector('button#record');
 recordButton.addEventListener('click', () => {
+
   if (recordButton.textContent === 'Start Recording') {
     startRecording();
   } else {
@@ -67,22 +71,30 @@ function handleSourceOpen(event) {
 
 function handleDataAvailable(event) {
   if (event.data && event.data.size > 0) {
-    let request = new XMLHttpRequest();
-    request.open("POST", "/");
 
-    // request.setRequestHeader('Content-type', 'application/json');
-    // request.send(JSON.stringify({filename : filename}));
+    if (preStreamingStarted) {
+      let request = new XMLHttpRequest();
+      request.open('POST', '/');
+      request.setRequestHeader('Content-type', 'application/json');
+      request.send(JSON.stringify({filename : filename}));
+      preStreamingStarted = false;
+    }
 
-    request.setRequestHeader("Content-type", "video/webm");
+    let vid_request = new XMLHttpRequest();
+    vid_request.open('POST', '/');
+    vid_request.setRequestHeader('Content-type', 'video/webm');
     const blob = new Blob([event.data], {type: 'video/webm'});
-    console.log(blob);
-    request.send(blob);
+    vid_request.send(blob);
 
     recordedBlobs.push(event.data);
   }
 }
 
 function startRecording() {
+  filename = makeid();
+  preStreamingStarted = true;
+  console.log(filename);
+
   recordedBlobs = [];
   let options = {mimeType: 'video/webm;codecs=vp9'};
   if (!MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -123,6 +135,8 @@ function startRecording() {
 
 function stopRecording() {
   mediaRecorder.stop();
+  filename = '';
+
   console.log('Recorded Blobs: ', recordedBlobs);
 }
 
@@ -143,6 +157,16 @@ async function init(constraints) {
     console.error('navigator.getUserMedia error:', e);
     errorMsgElement.innerHTML = `navigator.getUserMedia error:${e.toString()}`;
   }
+}
+
+function makeid() {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+  for (let i = 0; i < 10; i++)
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+
+  return `${text}.webm`;
 }
 
 document.querySelector('button#start').addEventListener('click', async () => {
